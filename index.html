@@ -196,27 +196,11 @@
 
 
 <body>
-
-<audio src="tt.mp3" id="M" class="media-audio" autoplay preload loop="loop"></audio>
-<script>
-    function audioAutoPlay(id){
-        var audio = document.getElementById(id),
-            play = function(){
-                audio.play();
-                document.removeEventListener("touchstart",play, false);
-            };
-        audio.play();
-        document.addEventListener("WeixinJSBridgeReady", function () {
-            play();
-        }, false);
-        document.addEventListener('YixinJSBridgeReady', function() {
-            play();
-        }, false);
-        document.addEventListener("touchstart",play, false);
-    }
-    audioAutoPlay('M');
-</script>
+  
   <div class="lovecontent">
+        <div class="this-div">
+          <audio src="tt.mp3" controls>
+        </div>
         <div class="this-div">
             我 和 园 宝 一 起 相 识 了
         </div>
@@ -229,7 +213,7 @@
                期待: 2023年1月24日 ==> 一生
         </div>
      
-
+  
         <div class="heart">
             <div class='topLeft'></div>
             <div class='topRight'></div>
