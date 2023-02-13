@@ -1,264 +1,458 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-<HTML>
- <HEAD>
-  <TITLE> New Document </TITLE>
-  <META NAME="Generator" CONTENT="EditPlus">
-  <META NAME="Author" CONTENT="">
-  <META NAME="Keywords" CONTENT="">
-  <META NAME="Description" CONTENT="">
-  <style>
-  html, body {
-  height: 100%;
-  padding: 0;
-  margin: 0;
-  background: #000;
-}
-canvas {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-}
-  </style>
- </HEAD>
+<html>
+<head>
+    <!-- TODO 这三个依赖看看能不能找到国内的源 -->
+    <!-- Load the latest version of TensorFlow.js -->
+    <script src="https://unpkg.com/@tensorflow/tfjs"></script>
+    <!-- Load the MobileNet Machine Learning Model -->
+    <script src="https://unpkg.com/@tensorflow-models/mobilenet"></script>
+    <!-- Load the KNN classifier that allows us to customise the MobileNet model -->
+    <script src="https://unpkg.com/@tensorflow-models/knn-classifier"></script>
+    <!-- TODO CSS样式不会写，自己看着改 -->
+    <style type="text/css">
+        /* styles that help display information on screen */
+        /*video {*/
+        /*    max-height: 500px;*/
+        /*}*/
 
- <BODY>
-  <canvas id="pinkboard"></canvas>
-  <script>
-  /*
- * Settings
- */
-var settings = {
-  particles: {
-    length:   500, // maximum amount of particles
-    duration:   2, // particle duration in sec
-    velocity: 100, // particle velocity in pixels/sec
-    effect: -0.75, // play with this for a nice effect
-    size:      30, // particle size in pixels
-  },
-};
+        .hide {
+            display: none !important;
+        }
 
-/*
- * RequestAnimationFrame polyfill by Erik Möller
- */
-(function(){var b=0;var c=["ms","moz","webkit","o"];for(var a=0;a<c.length&&!window.requestAnimationFrame;++a){window.requestAnimationFrame=window[c[a]+"RequestAnimationFrame"];window.cancelAnimationFrame=window[c[a]+"CancelAnimationFrame"]||window[c[a]+"CancelRequestAnimationFrame"]}if(!window.requestAnimationFrame){window.requestAnimationFrame=function(h,e){var d=new Date().getTime();var f=Math.max(0,16-(d-b));var g=window.setTimeout(function(){h(d+f)},f);b=d+f;return g}}if(!window.cancelAnimationFrame){window.cancelAnimationFrame=function(d){clearTimeout(d)}}}());
+        #start {
+            display: block;
+            margin-top: 200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
 
-/*
- * Point class
- */
-var Point = (function() {
-  function Point(x, y) {
-    this.x = (typeof x !== 'undefined') ? x : 0;
-    this.y = (typeof y !== 'undefined') ? y : 0;
-  }
-  Point.prototype.clone = function() {
-    return new Point(this.x, this.y);
-  };
-  Point.prototype.length = function(length) {
-    if (typeof length == 'undefined')
-      return Math.sqrt(this.x * this.x + this.y * this.y);
-    this.normalize();
-    this.x *= length;
-    this.y *= length;
-    return this;
-  };
-  Point.prototype.normalize = function() {
-    var length = this.length();
-    this.x /= length;
-    this.y /= length;
-    return this;
-  };
-  return Point;
-})();
+        html, body {
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            background: #000;
+        }
 
-/*
- * Particle class
- */
-var Particle = (function() {
-  function Particle() {
-    this.position = new Point();
-    this.velocity = new Point();
-    this.acceleration = new Point();
-    this.age = 0;
-  }
-  Particle.prototype.initialize = function(x, y, dx, dy) {
-    this.position.x = x;
-    this.position.y = y;
-    this.velocity.x = dx;
-    this.velocity.y = dy;
-    this.acceleration.x = dx * settings.particles.effect;
-    this.acceleration.y = dy * settings.particles.effect;
-    this.age = 0;
-  };
-  Particle.prototype.update = function(deltaTime) {
-    this.position.x += this.velocity.x * deltaTime;
-    this.position.y += this.velocity.y * deltaTime;
-    this.velocity.x += this.acceleration.x * deltaTime;
-    this.velocity.y += this.acceleration.y * deltaTime;
-    this.age += deltaTime;
-  };
-  Particle.prototype.draw = function(context, image) {
-    function ease(t) {
-      return (--t) * t * t + 1;
-    }
-    var size = image.width * ease(this.age / settings.particles.duration);
-    context.globalAlpha = 1 - this.age / settings.particles.duration;
-    context.drawImage(image, this.position.x - size / 2, this.position.y - size / 2, size, size);
-  };
-  return Particle;
-})();
+        .container {
+            position: relative;
+        }
 
-/*
- * ParticlePool class
- */
-var ParticlePool = (function() {
-  var particles,
-      firstActive = 0,
-      firstFree   = 0,
-      duration    = settings.particles.duration;
-  
-  function ParticlePool(length) {
-    // create and populate particle pool
-    particles = new Array(length);
-    for (var i = 0; i < particles.length; i++)
-      particles[i] = new Particle();
-  }
-  ParticlePool.prototype.add = function(x, y, dx, dy) {
-    particles[firstFree].initialize(x, y, dx, dy);
-    
-    // handle circular queue
-    firstFree++;
-    if (firstFree   == particles.length) firstFree   = 0;
-    if (firstActive == firstFree       ) firstActive++;
-    if (firstActive == particles.length) firstActive = 0;
-  };
-  ParticlePool.prototype.update = function(deltaTime) {
-    var i;
-    
-    // update active particles
-    if (firstActive < firstFree) {
-      for (i = firstActive; i < firstFree; i++)
-        particles[i].update(deltaTime);
-    }
-    if (firstFree < firstActive) {
-      for (i = firstActive; i < particles.length; i++)
-        particles[i].update(deltaTime);
-      for (i = 0; i < firstFree; i++)
-        particles[i].update(deltaTime);
-    }
-    
-    // remove inactive particles
-    while (particles[firstActive].age >= duration && firstActive != firstFree) {
-      firstActive++;
-      if (firstActive == particles.length) firstActive = 0;
-    }
-    
-    
-  };
-  ParticlePool.prototype.draw = function(context, image) {
-    // draw active particles
-    if (firstActive < firstFree) {
-      for (i = firstActive; i < firstFree; i++)
-        particles[i].draw(context, image);
-    }
-    if (firstFree < firstActive) {
-      for (i = firstActive; i < particles.length; i++)
-        particles[i].draw(context, image);
-      for (i = 0; i < firstFree; i++)
-        particles[i].draw(context, image);
-    }
-  };
-  return ParticlePool;
-})();
+        canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+<!-- Visualiser for predictions that the Machine Learning model comes back with -->
+<!-- TODO 这是用于AI结果展示的，可以删掉 -->
+<div id="console" class="hide"></div>
+<!-- Buttons that allow you to start and manage the Machine Learning process -->
+<video autoplay playsinline muted id="webcam"></video>
+<button id="class-a" class="hide">Add Yes</button>
+<button id="class-b" class="hide">Add No</button>
+<!-- TODO 这个开始按钮会回车替换会好一点 -->
+<button id="start" class="hide">start</button>
+<!-- TODO 这个canvas应该算是多余的 -->
+<!--描绘video截图-->
+<canvas id="canvas" width="100%" height="100%"></canvas>
+<div class="container">
+    <img id="img_pos" style="display: block"/>
+    <canvas id="base-bord" style="float:left;"></canvas>
+</div>
+</body>
+<script type="text/javascript">
 
-/*
- * Putting it all together
- */
-(function(canvas) {
-  var context = canvas.getContext('2d'),
-      particles = new ParticlePool(settings.particles.length),
-      particleRate = settings.particles.length / settings.particles.duration, // particles/sec
-      time;
-  
-  // get point on heart with -PI <= t <= PI
-  function pointOnHeart(t) {
-    return new Point(
-      160 * Math.pow(Math.sin(t), 3),
-      130 * Math.cos(t) - 50 * Math.cos(2 * t) - 20 * Math.cos(3 * t) - 10 * Math.cos(4 * t) + 25
-    );
-  }
-  
-  // creating the particle image using a dummy canvas
-  var image = (function() {
-    var canvas  = document.createElement('canvas'),
-        context = canvas.getContext('2d');
-    canvas.width  = settings.particles.size;
-    canvas.height = settings.particles.size;
-    // helper function to create the path
-    function to(t) {
-      var point = pointOnHeart(t);
-      point.x = settings.particles.size / 2 + point.x * settings.particles.size / 350;
-      point.y = settings.particles.size / 2 - point.y * settings.particles.size / 350;
-      return point;
-    }
-    // create the path
-    context.beginPath();
-    var t = -Math.PI;
-    var point = to(t);
-    context.moveTo(point.x, point.y);
-    while (t < Math.PI) {
-      t += 0.01; // baby steps!
-      point = to(t);
-      context.lineTo(point.x, point.y);
-    }
-    context.closePath();
-    // create the fill
-    context.fillStyle = '#ea80b0';
-    context.fill();
-    // create the image
-    var image = new Image();
-    image.src = canvas.toDataURL();
-    return image;
-  })();
-  
-  // render that thing!
-  function render() {
-    // next animation frame
-    requestAnimationFrame(render);
-    
-    // update time
-    var newTime   = new Date().getTime() / 1000,
-        deltaTime = newTime - (time || newTime);
-    time = newTime;
-    
-    // clear canvas
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // create new particles
-    var amount = particleRate * deltaTime;
-    for (var i = 0; i < amount; i++) {
-      var pos = pointOnHeart(Math.PI - 2 * Math.PI * Math.random());
-      var dir = pos.clone().length(settings.particles.velocity);
-      particles.add(canvas.width / 2 + pos.x, canvas.height / 2 - pos.y, dir.x, -dir.y);
-    }
-    
-    // update and draw particles
-    particles.update(deltaTime);
-    particles.draw(context, image);
-  }
-  
-  // handle (re-)sizing of the canvas
-  function onResize() {
-    canvas.width  = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-  }
-  window.onresize = onResize;
-  
-  // delay rendering bootstrap
-  setTimeout(function() {
-    onResize();
-    render();
-  }, 10);
-})(document.getElementById('pinkboard'));
-  </script>
- </BODY>
-</HTML>
+    // todo 这个listener应该可以不用加
+    window.addEventListener('load', function () {
+
+        // todo 常量值最好按照作用于区分开，而不是写一个匿名函数里面
+        const width = window.innerWidth;
+        // todo height可以考虑一下到底用什么值，然后定为const
+        let height = window.innerHeight;
+        height = width / 16 * 9
+        // 这个用于控制底图大小的
+        const cvsWidth = 800
+        const cvsHeight = cvsWidth / 16 * 9
+        const offLeft = (width - cvsWidth) / 2
+        const offHeight = (height - cvsHeight) / 2
+        // todo 这个flag应该作为控制消息进行传递，而不是作为变量值进行传递
+        let startFlag = false
+
+        console.log('javascript start ..');
+        const webcamElement = document.getElementById('webcam');
+        // todo 摄像头视频显示的宽高，应该用css控制
+        webcamElement.style.width = width;
+        webcamElement.style.height = height;
+        // todo knn不是最适合的模型
+        <!-- Create the KNN classifier that allows us to customise the MobileNet model -->
+        const classifier = knnClassifier.create();
+
+        console.log('classifier start ..');
+
+        <!-- Create an empty variable for the MobileNet model to be loaded into -->
+        let net;
+        //define buttons on screen
+        const startBtn = document.getElementById("start"),
+            classA = document.getElementById("class-a"),
+            classB = document.getElementById("class-b");
+
+        // todo 匿名函数里面套异步，风格特别差
+        <!-- Function that triggers the webcam and sets up the Machine Learning process -->
+        async function app() {
+
+            console.log('app start ..');
+            // classC = document.getElementById("class-c");
+
+            //hide and show buttons
+            startBtn.classList.remove("hide");
+            classA.classList.remove("hide");
+            classB.classList.remove("hide");
+            // classC.classList.remove("hide");
+
+            console.log('Loading mobilenet..');
+
+            // Load the model into the empty variable
+            net = await mobilenet.load();
+            console.log('Successfully loaded model');
+
+            // Create an object from Tensorflow.js data API which could capture image
+            // from the web camera as Tensor.
+            const webcam = await tf.data.webcam(webcamElement);
+
+            // Reads an image from the webcam and associates it with a specific class
+            // index.
+            const addExample = async classId => {
+                console.log("add addExample...............")
+                // Capture an image from the web camera.
+                const img = await webcam.capture();
+                // console.log(img)
+                // capture(img)
+
+                // Get the intermediate activation of MobileNet 'conv_preds' and pass that
+                // to the KNN classifier.
+                const activation = net.infer(img, 'conv_preds');
+
+                // Pass the intermediate activation to the classifier.
+                classifier.addExample(activation, classId);
+
+                // Dispose the tensor to release the memory.
+                img.dispose();
+            };
+
+            // When clicking a button, add an example for that class.
+            document.getElementById('class-a').addEventListener('click', () => addExample(0));
+            document.getElementById('class-b').addEventListener('click', () => addExample(1));
+            document.getElementById('start').addEventListener('click', () => start());
+            // document.getElementById('class-c').addEventListener('click', () => addExample(2));
+            // const saveModel = await classifier.save('downloads://my-model');
+            // document.getElementById('save-model').addEventListener('click', () => saveModel());
+
+            // A function that constantly assesses the webcam feed and outputs a prediction on screen
+            while (true) {
+                if (classifier.getNumClasses() > 0 && startFlag) {
+                    const img = await webcam.capture();
+
+                    // Get the activation from mobilenet from the webcam.
+                    const activation = net.infer(img, 'conv_preds');
+                    // Get the most likely class and confidences from the classifier module.
+                    const result = await classifier.predictClass(activation);
+
+                    // const classes = ['You chose Rock, I choose Paper!', 'You chose Paper, I choose Scissors!', 'You chose Scissors, I chose Rock!'];
+                    const classes = ['Yes', 'No'];
+                    // todo 要显示内容可以把这一段打开
+                    // document.getElementById('console').innerText = `
+                    //     prediction: ${classes[result.label]}\n
+                    //     probability: ${result.confidences[result.label]}
+                    //   `;
+                    // Dispose the tensor to release the memory.
+                    img.dispose();
+                    // console.log(classes[result.label]==="Yes")
+                    // todo 这个应该选多次都达标，否则太容易触发了
+                    if (classes[result.label] === "Yes" && result.confidences[result.label] >= 1) {
+                        // todo 这段有点儿乱，不应该是调用，应该是event
+                        capture(webcamElement)
+                        document.getElementById('webcam').style.display = "none";
+                        webcamElement.style.display = "none";
+                        // webcamElement.remove()
+                        break;
+                    }
+                }
+
+                await tf.nextFrame();
+            }
+        }
+
+        // todo 这些常量的位置都不太好
+        const cvs = document.getElementById('base-bord');
+        const ctx = cvs.getContext('2d');
+
+        document.onkeydown= async function() {
+            let e = window.event || arguments[0];
+            if (e.keyCode === 8) {
+                cvs.style.display = "none";
+                document.getElementById('img_pos').style.display = "none";
+                webcamElement.style.display = "block";
+
+                const webcam = await tf.data.webcam(webcamElement);
+                // todo 这就是段重复代码，本质上是按删除键可以继续使用，不用重新训练
+                // A function that constantly assesses the webcam feed and outputs a prediction on screen
+                while (true) {
+                    if (classifier.getNumClasses() > 0 && startFlag) {
+                        const img = await webcam.capture();
+
+                        // Get the activation from mobilenet from the webcam.
+                        const activation = net.infer(img, 'conv_preds');
+                        // Get the most likely class and confidences from the classifier module.
+                        const result = await classifier.predictClass(activation);
+
+                        // const classes = ['You chose Rock, I choose Paper!', 'You chose Paper, I choose Scissors!', 'You chose Scissors, I chose Rock!'];
+                        const classes = ['Yes', 'No'];
+                        // document.getElementById('console').innerText = `
+                        //     prediction: ${classes[result.label]}\n
+                        //     probability: ${result.confidences[result.label]}
+                        //   `;
+                        // Dispose the tensor to release the memory.
+                        img.dispose();
+                        // console.log(classes[result.label]==="Yes")
+                        if (classes[result.label] === "Yes" && result.confidences[result.label] >= 1) {
+                            capture(webcamElement)
+                            document.getElementById('webcam').style.display = "none";
+                            webcamElement.style.display = "none";
+                            count = 0
+                            t = new Date().getTime()
+                            c = 0
+                            degree = 0
+                            cvs.style.display = "block";
+                            // webcamElement.remove()
+                            break;
+                        }
+                    }
+
+                    await tf.nextFrame();
+                }
+            }
+        }
+
+        // todo totally shit
+        function start() {
+            // classA.remove()
+            // classB.remove()
+            classA.style.display = "none";
+            classB.style.display = "none";
+            startFlag = true;
+            // startBtn.remove()
+            startBtn.style.display = "none";
+        }
+
+        // todo wtf
+        let canvas = document.getElementById("canvas");
+        canvas.width = width
+        canvas.height = height
+        let context = canvas.getContext("2d");
+
+        //注册拍照按钮的单击事件
+        function capture(img) {
+            let captureState = 1
+            //绘制画面
+            if (captureState == 0) {
+                alert("请先开启摄像头");
+                return;
+            }
+            context.drawImage(img, 0, 0, width, height);//后面两个长宽
+            console.log(width + "======================" + height)
+            let b64 = canvas.toDataURL("image/png");//即可得到base64编码
+            console.log(b64);
+            // canvas.remove()
+            canvas.style.display = "none";
+
+            let imgEle = document.getElementById('img_pos');
+            imgEle.width = cvsWidth
+            imgEle.height = cvsHeight
+            imgEle.setAttribute('style', "padding-left:" + offLeft + "px;" + ";padding-right:" + offLeft + "px;padding-top:" + offHeight + "px;padding-bottom:" + offHeight + "px;");
+            imgEle.src = b64
+            // todo 函数前台，totally shit
+            drawHeart()
+            captureState = 2;
+        }
+        // ctx.fillStyle = "black";
+        // todo 简直就是wtf
+        cvs.width = width
+        cvs.height = height
+
+        // todo 控制属性，到处写，shit
+        let duration = 100
+        let count = 0
+        let t = new Date().getTime()
+        let c = 0
+        let degree = 0
+
+        // todo 一点都不优雅
+        function drawHeart() {
+            requestAnimationFrame(drawHeart)
+            let now = new Date().getTime()
+            if (now -t < duration) {
+                return
+            }
+            t = now
+            if (c === 0) {
+                lip()
+                return;
+            }
+            if (c === 1) {
+                slowShow()
+                return;
+            }
+            rain();
+        }
+
+        function rain() {
+            ctx.fillRect(0, 0, cvs.width, cvs.height);
+            // ctx.clearRect(offLeft, offHeight, cvsWidth, cvsHeight);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = "rgba(253,139,254, 1)";
+            // ctx.fillStyle = "#f23232"
+            // h = height - count
+            if (count < 20) {
+                count += 2
+            }
+            // if (h < height /2 ) {
+            //     h = height / 2
+            // }
+            ctx.translate(width / 2, height / 2);
+            ctx.scale(1, -1);
+            ctx.moveTo(0, 0);
+            let centerArray = []
+            let angle = 0, x = 0, y = 0, a = 20; // - 5.0 * Math.random();
+            // todo 0-2pi，用while更好一点
+            for (let i = 0; i < 30; i += 0.2) {
+                angle = i / Math.PI;
+                x = 0 + a * (16 * Math.sin(angle) ** 3);
+                y = 0 + a * (13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+                ctx.lineTo(x, y);
+                centerArray.push([width / 2 - x , height / 2 - y])
+            }
+            ctx.fill();
+            ctx.closePath();
+            ctx.restore();
+            // ctx.globalCompositeOperation = 'destination-in'
+            // todo 两个心形线公式应该分开
+            for (let j=0; j< 500; j++) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.fillStyle = "rgba(253,139,254)";
+                let center = centerArray[Math.floor(centerArray.length * Math.random())]
+                console.log(center)
+                ctx.translate(center[0] + 20 - 40 * Math.random(), center[1] + 20 - 40 * Math.random());
+                ctx.scale(1, -1);
+                ctx.moveTo(0, 0);
+                let angle = 0, x = 0, y = 0, a = 1 - Math.random();
+                for (let i = 0; i < 30; i += 0.2) {
+                    angle = i / Math.PI;
+                    x = a * (16 * Math.sin(angle) ** 3);
+                    y = a * (13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+                    ctx.lineTo(x, y);
+                }
+                ctx.fill();
+                ctx.closePath();
+                ctx.restore();
+            }
+        }
+
+        function slowShow() {
+            ctx.fillRect(0, 0, cvs.width, cvs.height);
+            // ctx.clearRect(offLeft, offHeight, cvsWidth, cvsHeight);
+            ctx.save();
+            ctx.beginPath();
+            ctx.globalCompositeOperation = 'destination-out';
+            degree += 0.01
+            if (degree > 1) {
+                c = 2
+            }
+            ctx.fillStyle = "rgba(253,139,254, "+ degree +")";
+            ctx.translate(width / 2, height / 2);
+            ctx.scale(1, -1);
+            ctx.moveTo(0, 0);
+            let centerArray = []
+            let angle = 0, x = 0, y = 0, a = 20; // - 5.0 * Math.random();
+            for (let i = 0; i < 30; i += 0.2) {
+                angle = i / Math.PI;
+                x = a * (16 * Math.sin(angle) ** 3);
+                y = a * (13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+                ctx.lineTo(x, y);
+                centerArray.push([width / 2 - x , height / 2 - y])
+            }
+            ctx.fill();
+            ctx.closePath();
+            ctx.restore();
+            // ctx.globalCompositeOperation = 'destination-in'
+            // todo 代码自重复太高 shit
+            for (let j=0; j< degree * 500; j++) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.fillStyle = "rgba(253,139,254)";
+                let center = centerArray[Math.floor(centerArray.length * Math.random())]
+                console.log(center)
+                ctx.translate(center[0] + 20 - 40 * Math.random(), center[1] + 20 - 40 * Math.random());
+                ctx.scale(1, -1);
+                ctx.moveTo(0, 0);
+                let angle = 0, x = 0, y = 0, a = 1 - Math.random();
+                for (let i = 0; i < 30; i += 0.2) {
+                    angle = i / Math.PI;
+                    x = a * (16 * Math.sin(angle) ** 3);
+                    y = a * (13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+                    ctx.lineTo(x, y);
+                }
+                ctx.fill();
+                ctx.closePath();
+                ctx.restore();
+            }
+        }
+
+        // todo totally shit
+        function lip() {
+            ctx.fillRect(0, 0, cvs.width, cvs.height);
+            // ctx.clearRect(offLeft, offHeight, cvsWidth, cvsHeight);
+
+            ctx.save();
+            ctx.beginPath();
+            // ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = "rgba(253,192, 203)";
+            // ctx.fillStyle = "#f23232"
+            h = height - count
+            count += 20
+            if (h < height /2 ) {
+                h = height / 2
+                c = 1
+            }
+            ctx.translate(width / 2, h);
+            ctx.scale(1, -1);
+            ctx.moveTo(0, 0);
+            let angle = 0, x = 0, y = 0;
+            let a =  count/30; // - 5.0 * Math.random();
+            if (a > 20) {
+                a = 20
+            }
+            for (let i = 0; i < 30; i += 0.2) {
+                angle = i / Math.PI;
+                x = 0 + a * (16 * Math.sin(angle) ** 3);
+                y = 0 + a * (13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+                ctx.lineTo(x, y);
+            }
+            ctx.fill();
+            ctx.closePath();
+            ctx.restore();
+        }
+
+        app();
+
+        // trigger the experience to start when you click the 'Click here to start' button
+        // document.getElementById('start').addEventListener('click', () => app());
+    })
+</script>
+</html>
