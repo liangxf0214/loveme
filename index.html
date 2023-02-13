@@ -196,20 +196,8 @@
 
 
 <body>
-<audio src="tt.mp3" id="Jaudio" class="media-audio" autoplay preload loop="loop"></audio>
-         <script type="text/javascript">
-            function audioAutoPlay(id){
-                var audio = document.getElementById(id);
-                audio.play();
-                document.addEventListener("WeixinJSBridgeReady", function () {
-                    audio.play();
-                }, false);
-                document.addEventListener('YixinJSBridgeReady', function() {
-                    audio.play();
-                }, false);
-            }
-        audioAutoPlay('Jaudio');
-        </script>
+<audio src="tt.mp3" id="M" class="media-audio" autoplay preload loop="loop"></audio>
+ 
 
 
 
@@ -262,8 +250,12 @@
 
 </script>
 
-
-
+<script src="http://res.weixin.qq.com/open/js/jweixin-1.0.0.js"></script>
+<script type="text/javascript">
+document.addEventListener("WeixinJSBridgeReady", function () {
+                    M.play();
+                }, false);
+</script>
 </body>
 
 </html>
