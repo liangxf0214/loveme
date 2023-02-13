@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8"/>
   <title>lovestory</title>
-  <embed src="tt.mp3"  class="videoPlay" type="video/mp3" hidden=true autostart=true loop=true></embed>
+
 </head>
 
 <div th:replace="themes/default/loveheader::header('我和她的恋爱',null)"></div>
@@ -196,8 +196,20 @@
 
 
 <body>
-
-
+<audio src="tt.mp3" id="Jaudio" class="media-audio" autoplay preload loop="loop"></audio>
+        <script type="text/javascript">
+            function audioAutoPlay(id){
+                var audio = document.getElementById(id);
+                audio.play();
+                document.addEventListener("WeixinJSBridgeReady", function () {
+                    audio.play();
+                }, false);
+                document.addEventListener('YixinJSBridgeReady', function() {
+                    audio.play();
+                }, false);
+            }
+        audioAutoPlay('Jaudio');
+        </script>
     <div class="lovecontent">
 
 
