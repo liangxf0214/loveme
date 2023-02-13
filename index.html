@@ -197,7 +197,19 @@
 
 <body>
 <audio src="tt.mp3" id="Jaudio" class="media-audio" autoplay preload loop="loop"></audio>
-    <div class="lovecontent">
+         <script type="text/javascript">
+            function audioAutoPlay(id){
+                var audio = document.getElementById(id);
+                audio.play();
+                document.addEventListener("WeixinJSBridgeReady", function () {
+                    audio.play();
+                }, false);
+                document.addEventListener('YixinJSBridgeReady', function() {
+                    audio.play();
+                }, false);
+            }
+        audioAutoPlay('Jaudio');
+        </script>
 
 
 
@@ -248,25 +260,6 @@
     timer();
     setInterval(timer, 1000);
 
- var music = document.querySelector("audio");
-
-var state = 0;  //初始暂停状态
-
-document.addEventListener("WeixinJSBridgeReady", function () {
-
-music.play();  //音乐播放
-
-}, false);
-
-//循环播放
-
-music.onended = function () {
-
-music.load();
-
-music.play();
-
-}
 </script>
 
 
